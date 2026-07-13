@@ -43,13 +43,17 @@ exports.getBook = async (req, res, next) => {
 exports.createBook = async (req, res, next) => {
   try {
     const { isbn, title, author, category, description, cover, stock } = req.body
+    let coverValue = cover
+    if (req.file) {
+      coverValue = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`
+    }
     const book = await Book.create({
       isbn,
       title,
       author,
       category,
       description,
-      cover,
+      cover: coverValue,
       stock,
       available: stock,
     })
@@ -68,6 +72,10 @@ exports.updateBook = async (req, res, next) => {
     if (!book) return res.status(404).json({ success: false, message: 'Libro no encontrado' })
 
     const { isbn, title, author, category, description, cover, stock } = req.body
+    let coverValue = cover
+    if (req.file) {
+      coverValue = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`
+    }
 
     // Si cambia el stock, ajustar disponibles manteniendo la cantidad prestada
     if (stock !== undefined && stock !== book.stock) {
@@ -81,7 +89,7 @@ exports.updateBook = async (req, res, next) => {
     if (author !== undefined) book.author = author
     if (category !== undefined) book.category = category
     if (description !== undefined) book.description = description
-    if (cover !== undefined) book.cover = cover
+    if (coverValue !== undefined) book.cover = coverValue
 
     await book.save()
     res.status(200).json({ success: true, book })

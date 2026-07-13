@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Search, BookOpen } from 'lucide-react'
 import api from '../../api/axios'
 
 export default function ReaderCatalog() {
   const [books, setBooks] = useState([])
   const [search, setSearch] = useState('')
+  const [selectedCategory, setSelectedCategory] = useState('Todos')
+  const [availableOnly, setAvailableOnly] = useState(false)
   const [loading, setLoading] = useState(true)
   const [message, setMessage] = useState('')
   const [requesting, setRequesting] = useState(null)
@@ -20,9 +22,29 @@ export default function ReaderCatalog() {
   }
 
   useEffect(() => {
-    const t = setTimeout(() => fetchBooks(search), 300)
-    return () => clearTimeout(t)
+    const timeout = setTimeout(() => fetchBooks(search), 300)
+    return () => clearTimeout(timeout)
   }, [search])
+
+  const categories = useMemo(
+    () => ['Todos', ...Array.from(new Set(books.map((book) => book.category).filter(Boolean)))],
+    [books]
+  )
+
+  const filteredBooks = useMemo(
+    () =>
+      books.filter((book) => {
+        const term = search.toLowerCase()
+        const matchesSearch =
+          book.title.toLowerCase().includes(term) ||
+          book.author.toLowerCase().includes(term) ||
+          book.isbn.toLowerCase().includes(term)
+        const matchesCategory = selectedCategory === 'Todos' || book.category === selectedCategory
+        const matchesAvailability = !availableOnly || book.available > 0
+        return matchesSearch && matchesCategory && matchesAvailability
+      }),
+    [books, search, selectedCategory, availableOnly]
+  )
 
   const requestLoan = async (book) => {
     setRequesting(book._id)
@@ -39,55 +61,117 @@ export default function ReaderCatalog() {
   }
 
   return (
-    <div className="space-y-5">
-      <div>
-        <h2 className="text-xl font-bold text-navy">Catálogo de Libros</h2>
-        <p className="text-sm text-gray-400">Explore y solicite préstamos de los libros disponibles</p>
+    <div className="space-y-6">
+      <div className="rounded-[32px] bg-gradient-to-r from-[#1F2A3C] to-[#293850] p-8 text-white shadow-[0_24px_80px_rgba(15,23,42,0.18)]">
+        <p className="text-sm uppercase tracking-[0.24em] text-slate-300">Catálogo</p>
+        <h1 className="mt-3 text-3xl font-bold">Catálogo de Libros</h1>
+        <p className="mt-3 max-w-2xl text-sm text-slate-300">Explore nuestra colección de títulos disponibles y solicite préstamos de forma rápida.</p>
       </div>
 
-      <div className="bg-white rounded-2xl p-4" style={{ boxShadow: '0 2px 12px rgba(31,42,60,0.07)' }}>
-        <div className="relative">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Buscar por título, autor o ISBN…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-2.5 rounded-xl border text-sm outline-none border-border bg-gray-50 text-navy focus:border-gold"
-          />
+      <div className="bg-white rounded-[28px] p-6 shadow-sm border border-slate-200">
+        <div className="grid gap-4 lg:grid-cols-[1.5fr_0.7fr]">
+          <div className="relative">
+            <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Buscar por título, autor o ISBN…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-12 pr-4 text-sm text-slate-900 outline-none focus:border-[#C9A227]"
+            />
+          </div>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+            <label className="flex items-center gap-2 text-sm text-slate-600">
+              <input
+                type="checkbox"
+                checked={availableOnly}
+                onChange={(e) => setAvailableOnly(e.target.checked)}
+                className="h-4 w-4 rounded border-slate-300 text-[#C9A227]"
+              />
+              Solo disponibles
+            </label>
+            <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
+              {filteredBooks.length} libros encontrados
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-5 flex flex-wrap gap-2">
+          {categories.map((category) => (
+            <button
+              type="button"
+              key={category}
+              onClick={() => setSelectedCategory(category)}
+              className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+                selectedCategory === category
+                  ? 'bg-[#1F2A3C] text-white'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              {category}
+            </button>
+          ))}
         </div>
       </div>
 
-      {message && <p className="text-sm px-4 py-2 rounded-lg bg-yellow-50 text-gold-muted">{message}</p>}
+      {message && (
+        <div className="rounded-[28px] border border-amber-100 bg-amber-50 px-5 py-4 text-sm text-amber-900">
+          {message}
+        </div>
+      )}
 
       {loading ? (
-        <p className="text-center text-gray-400 py-10">Cargando catálogo…</p>
+        <p className="text-center text-slate-500 py-16">Cargando catálogo…</p>
+      ) : filteredBooks.length === 0 ? (
+        <div className="rounded-[28px] border border-slate-200 bg-white p-10 text-center text-slate-500 shadow-sm">
+          No se encontraron libros con esos filtros.
+        </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {books.map((b) => (
-            <div key={b._id} className="bg-white rounded-2xl p-5 flex flex-col" style={{ boxShadow: '0 2px 12px rgba(31,42,60,0.07)' }}>
-              <div className="flex items-start gap-3 mb-3">
-                <div className="w-12 h-16 rounded-lg flex items-center justify-center flex-shrink-0 bg-yellow-50">
-                  <BookOpen size={20} className="text-gold" />
-                </div>
-                <div className="min-w-0">
-                  <p className="font-semibold text-navy truncate">{b.title}</p>
-                  <p className="text-xs text-gray-400 truncate">{b.author}</p>
-                  <span className="inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700">{b.category}</span>
-                </div>
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
+          {filteredBooks.map((book) => (
+            <div
+              key={book._id}
+              className="group overflow-hidden rounded-[28px] bg-white shadow-[0_12px_30px_rgba(15,23,42,0.08)] transition-transform duration-300 hover:-translate-y-1"
+            >
+              <div className="h-56 overflow-hidden bg-slate-100">
+                {book.cover ? (
+                  <img
+                    src={book.cover}
+                    alt={`Portada ${book.title}`}
+                    className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                  />
+                ) : (
+                  <div className="flex h-full items-center justify-center bg-slate-100 text-slate-400">
+                    <BookOpen size={32} />
+                  </div>
+                )}
               </div>
-              {b.description && <p className="text-xs text-muted mb-3 line-clamp-2">{b.description}</p>}
-              <div className="mt-auto flex items-center justify-between pt-3 border-t border-border">
-                <span className="text-xs font-medium" style={{ color: b.available > 0 ? '#10B981' : '#EF4444' }}>
-                  {b.available > 0 ? `${b.available} disponibles` : 'Agotado'}
-                </span>
+
+              <div className="flex h-full flex-col gap-4 p-5">
+                <div className="flex items-start justify-between gap-3">
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.1em] text-slate-600">
+                    {book.category}
+                  </span>
+                  <span
+                    className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                      book.available > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'
+                    }`}
+                  >
+                    {book.available > 0 ? `${book.available} disponibles` : 'Agotado'}
+                  </span>
+                </div>
+                <div>
+                  <h2 className="text-xl font-semibold text-slate-900">{book.title}</h2>
+                  <p className="mt-2 text-sm text-slate-500">{book.author}</p>
+                </div>
+                {book.description && <p className="text-sm text-slate-500 line-clamp-3">{book.description}</p>}
                 <button
-                  onClick={() => requestLoan(b)}
-                  disabled={b.available === 0 || requesting === b._id}
-                  className="px-4 py-1.5 rounded-lg text-xs font-semibold text-white disabled:opacity-40 hover:opacity-90"
-                  style={{ background: 'linear-gradient(135deg, #1F2A3C, #2A3A52)' }}
+                  type="button"
+                  onClick={() => requestLoan(book)}
+                  disabled={book.available === 0 || requesting === book._id}
+                  className="mt-auto inline-flex items-center justify-center rounded-2xl bg-[#1F2A3C] px-4 py-3 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {requesting === b._id ? 'Solicitando…' : 'Solicitar'}
+                  {requesting === book._id ? 'Solicitando…' : 'Solicitar'}
                 </button>
               </div>
             </div>

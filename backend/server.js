@@ -1,6 +1,7 @@
 require('dotenv').config()
 const express = require('express')
 const cors = require('cors')
+const path = require('path')
 const connectDB = require('./config/db')
 const { errorHandler, notFound } = require('./middleware/errorHandler')
 const reportRoutes = require('./routes/reportRoutes')
@@ -19,6 +20,7 @@ const app = express()
 app.use(cors({ origin: process.env.CLIENT_URL || '*', credentials: true }))
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')))
 
 // Ruta de salud
 app.get('/api/health', (req, res) => {

@@ -3,7 +3,7 @@ import { Plus, Search, Edit2, Trash2, X, BookOpen } from 'lucide-react'
 import api from '../../api/axios'
 
 const CATEGORIES = ['Novela', 'Ciencias', 'Historia', 'Cuento', 'Distopía', 'Filosofía', 'Poesía', 'Técnico']
-const EMPTY = { isbn: '', title: '', author: '', category: 'Novela', stock: '1', description: '' }
+const EMPTY = { isbn: '', title: '', author: '', category: 'Novela', stock: '1', cover: '', coverFile: null, description: '' }
 
 export default function AdminBooks() {
   const [books, setBooks] = useState([])
@@ -36,7 +36,7 @@ export default function AdminBooks() {
   const openAdd = () => { setForm(EMPTY); setError(''); setModal('add') }
   const openEdit = (b) => {
     setSelected(b)
-    setForm({ isbn: b.isbn, title: b.title, author: b.author, category: b.category, stock: String(b.stock), description: b.description || '' })
+    setForm({ isbn: b.isbn, title: b.title, author: b.author, category: b.category, stock: String(b.stock), cover: b.cover || '', coverFile: null, description: b.description || '' })
     setError('')
     setModal('edit')
   }
@@ -49,7 +49,19 @@ export default function AdminBooks() {
     setSaving(true)
     setError('')
     try {
-      const payload = { ...form, stock: Number(form.stock) }
+      const payload = new FormData()
+      payload.append('isbn', form.isbn)
+      payload.append('title', form.title)
+      payload.append('author', form.author)
+      payload.append('category', form.category)
+      payload.append('description', form.description)
+      payload.append('stock', form.stock)
+      if (form.coverFile) {
+        payload.append('coverFile', form.coverFile)
+      } else {
+        payload.append('cover', form.cover || '')
+      }
+
       if (modal === 'add') {
         await api.post('/books', payload)
       } else {
@@ -128,8 +140,19 @@ export default function AdminBooks() {
                 <tr key={b._id} style={{ borderBottom: i < books.length - 1 ? '1px solid #F1F5F9' : 'none' }} className="hover:bg-gray-50 transition-colors">
                   <td className="px-4 py-3 font-mono text-xs text-muted">{b.isbn}</td>
                   <td className="px-4 py-3">
-                    <p className="font-semibold text-navy">{b.title}</p>
-                    <p className="text-xs text-gray-400">{b.author}</p>
+                    <div className="flex items-center gap-3">
+                      {b.cover ? (
+                        <img src={b.cover} alt={b.title} className="h-16 w-12 rounded-lg object-cover shadow-sm" />
+                      ) : (
+                        <div className="flex h-16 w-12 items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-50 text-[10px] text-slate-400">
+                          Sin imagen
+                        </div>
+                      )}
+                      <div>
+                        <p className="font-semibold text-navy">{b.title}</p>
+                        <p className="text-xs text-gray-400">{b.author}</p>
+                      </div>
+                    </div>
                   </td>
                   <td className="px-4 py-3">
                     <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700">{b.category}</span>
@@ -201,6 +224,24 @@ export default function AdminBooks() {
                   <div>
                     <label className="block text-xs font-semibold mb-1.5 text-muted">STOCK</label>
                     <input type="number" min="0" value={form.stock} onChange={(e) => set('stock', e.target.value)} className={inputCls} required />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-xs font-semibold mb-1.5 text-muted">PORTADA (archivo o URL)</label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => set('coverFile', e.target.files?.[0] || null)}
+                      className={inputCls}
+                    />
+                    <input
+                      value={form.cover}
+                      onChange={(e) => set('cover', e.target.value)}
+                      className={inputCls + ' mt-3'}
+                      placeholder="https://..."
+                    />
+                    <p className="text-xs text-gray-400 mt-2">
+                      Puede subir un archivo de imagen o pegar la URL de la portada. Si selecciona un archivo, este tendrá prioridad.
+                    </p>
                   </div>
                   <div className="col-span-2">
                     <label className="block text-xs font-semibold mb-1.5 text-muted">DESCRIPCIÓN</label>

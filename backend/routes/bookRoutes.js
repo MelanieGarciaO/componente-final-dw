@@ -11,6 +11,7 @@ const { protect, authorize } = require('../middleware/auth')
 const validate = require('../middleware/validate')
 
 const router = express.Router()
+const upload = require('../middleware/upload')
 
 const bookValidation = [
   body('isbn').trim().notEmpty().withMessage('El ISBN es obligatorio'),
@@ -24,8 +25,8 @@ router.use(protect) // Todas las rutas de libros requieren autenticación
 
 router.get('/', getBooks)
 router.get('/:id', getBook)
-router.post('/', authorize('admin'), bookValidation, validate, createBook)
-router.put('/:id', authorize('admin'), updateBook)
+router.post('/', authorize('admin'), upload.single('coverFile'), bookValidation, validate, createBook)
+router.put('/:id', authorize('admin'), upload.single('coverFile'), updateBook)
 router.delete('/:id', authorize('admin'), deleteBook)
 
 module.exports = router
