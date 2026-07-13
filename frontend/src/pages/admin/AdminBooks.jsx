@@ -10,17 +10,23 @@ export default function AdminBooks() {
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalItems, setTotalItems] = useState(0)
 
   const [modal, setModal] = useState(null) // null | 'add' | 'edit'
   const [selected, setSelected] = useState(null)
   const [form, setForm] = useState(EMPTY)
   const [saving, setSaving] = useState(false)
 
-  const fetchBooks = async (searchTerm = '') => {
+  const fetchBooks = async (searchTerm = '', pageNumber = 1) => {
     setLoading(true)
     try {
-      const { data } = await api.get('/books', { params: { search: searchTerm } })
-      setBooks(data.books)
+      const { data } = await api.get('/books', { params: { search: searchTerm, page: pageNumber, limit: 8 } })
+      setBooks(data.books || [])
+      setPage(data.page || 1)
+      setTotalPages(data.totalPages || 1)
+      setTotalItems(data.totalItems || 0)
     } catch (err) {
       setError(err.response?.data?.message || 'Error al cargar los libros')
     } finally {
@@ -29,9 +35,9 @@ export default function AdminBooks() {
   }
 
   useEffect(() => {
-    const timeout = setTimeout(() => fetchBooks(search), 300) // debounce de búsqueda
+    const timeout = setTimeout(() => fetchBooks(search, page), 300)
     return () => clearTimeout(timeout)
-  }, [search])
+  }, [search, page])
 
   const openAdd = () => { setForm(EMPTY); setError(''); setModal('add') }
   const openEdit = (b) => {
@@ -68,7 +74,7 @@ export default function AdminBooks() {
         await api.put(`/books/${selected._id}`, payload)
       }
       closeModal()
-      fetchBooks(search)
+      fetchBooks(search, 1)
     } catch (err) {
       setError(err.response?.data?.message || 'No se pudo guardar el libro')
     } finally {
@@ -80,7 +86,7 @@ export default function AdminBooks() {
     if (!window.confirm(`¿Eliminar "${book.title}"? Esta acción no se puede deshacer.`)) return
     try {
       await api.delete(`/books/${book._id}`)
-      fetchBooks(search)
+      fetchBooks(search, 1)
     } catch (err) {
       alert(err.response?.data?.message || 'No se pudo eliminar el libro')
     }
@@ -93,7 +99,7 @@ export default function AdminBooks() {
       <div className="flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
         <div>
           <h2 className="text-xl font-bold text-navy">Gestión de Libros</h2>
-          <p className="text-sm text-gray-400">{books.length} libros registrados</p>
+          <p className="text-sm text-gray-400">{totalItems} libros registrados</p>
         </div>
         <button
           onClick={openAdd}
@@ -111,7 +117,10 @@ export default function AdminBooks() {
             type="text"
             placeholder="Buscar por título, autor o ISBN…"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value)
+              setPage(1)
+            }}
             className="w-full pl-9 pr-4 py-2.5 rounded-xl border text-sm outline-none border-border bg-gray-50 text-navy focus:border-gold"
           />
         </div>
@@ -183,6 +192,30 @@ export default function AdminBooks() {
           </table>
         </div>
       </div>
+
+      {totalPages > 1 && (
+        <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-gray-500">Página {page} de {totalPages}</p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setPage((current) => Math.max(1, current - 1))}
+              disabled={page === 1 || loading}
+              className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-600 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Anterior
+            </button>
+            <button
+              type="button"
+              onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+              disabled={page === totalPages || loading}
+              className="rounded-xl bg-[#1F2A3C] px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Siguiente
+            </button>
+          </div>
+        </div>
+      )}
 
       {modal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">

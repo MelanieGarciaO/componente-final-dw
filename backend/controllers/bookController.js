@@ -5,7 +5,7 @@ const Book = require('../models/Book')
 // @access  Privado
 exports.getBooks = async (req, res, next) => {
   try {
-    const { search, category } = req.query
+    const { search, category, page = '1', limit = '8' } = req.query
     const filter = {}
 
     if (search) {
@@ -17,8 +17,28 @@ exports.getBooks = async (req, res, next) => {
     }
     if (category) filter.category = category
 
-    const books = await Book.find(filter).sort({ createdAt: -1 })
-    res.status(200).json({ success: true, count: books.length, books })
+    const pageNumber = Math.max(1, parseInt(page, 10) || 1)
+    const limitNumber = Math.min(20, Math.max(1, parseInt(limit, 10) || 8))
+    const skip = (pageNumber - 1) * limitNumber
+
+    const [books, totalItems] = await Promise.all([
+      Book.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limitNumber),
+      Book.countDocuments(filter),
+    ])
+
+    const totalPages = Math.ceil(totalItems / limitNumber)
+
+    res.status(200).json({
+      success: true,
+      count: books.length,
+      page: pageNumber,
+      limit: limitNumber,
+      totalItems,
+      totalPages,
+      hasNextPage: pageNumber < totalPages,
+      hasPrevPage: pageNumber > 1,
+      books,
+    })
   } catch (error) {
     next(error)
   }

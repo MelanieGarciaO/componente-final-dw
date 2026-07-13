@@ -38,12 +38,20 @@ export default function AdminUsers() {
   const [form, setForm] = useState(EMPTY)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalItems, setTotalItems] = useState(0)
 
-  const fetchUsers = async () => {
+  const fetchUsers = async (pageNumber = 1, searchTerm = '', tipoValue = 'all') => {
     setLoading(true)
     try {
-      const { data } = await api.get('/users')
-      setUsers(data.users.filter((u) => u.role === 'reader'))
+      const { data } = await api.get('/users', {
+        params: { role: 'reader', page: pageNumber, limit: 8, search: searchTerm, tipoLector: tipoValue === 'all' ? '' : tipoValue },
+      })
+      setUsers(data.users || [])
+      setPage(data.page || 1)
+      setTotalPages(data.totalPages || 1)
+      setTotalItems(data.totalItems || 0)
     } catch (err) {
       setError(err.response?.data?.message || 'Error al cargar usuarios')
     } finally {
@@ -51,14 +59,10 @@ export default function AdminUsers() {
     }
   }
 
-  useEffect(() => { fetchUsers() }, [])
-
-  const filtered = users.filter((u) => {
-    const matchesSearch =
-      u.name.toLowerCase().includes(search.toLowerCase()) || u.email.toLowerCase().includes(search.toLowerCase())
-    const matchesTipo = tipoFilter === 'all' || u.tipoLector === tipoFilter
-    return matchesSearch && matchesTipo
-  })
+  useEffect(() => {
+    const timeout = setTimeout(() => fetchUsers(page, search, tipoFilter), 300)
+    return () => clearTimeout(timeout)
+  }, [page, search, tipoFilter])
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
 
@@ -87,7 +91,7 @@ export default function AdminUsers() {
         await api.post('/users', { ...form, role: 'reader' })
       }
       setModal(false)
-      fetchUsers()
+      fetchUsers(1, search, tipoFilter)
     } catch (err) {
       setError(err.response?.data?.message || 'No se pudo guardar el usuario')
     } finally {
@@ -99,7 +103,7 @@ export default function AdminUsers() {
     if (!window.confirm(`¿Eliminar al usuario "${u.name}"?`)) return
     try {
       await api.delete(`/users/${u._id}`)
-      fetchUsers()
+      fetchUsers(1, search, tipoFilter)
     } catch (err) {
       alert(err.response?.data?.message || 'No se pudo eliminar el usuario')
     }
@@ -112,7 +116,7 @@ export default function AdminUsers() {
       <div className="flex flex-col sm:flex-row sm:items-start gap-3 justify-between">
         <div>
           <h2 className="text-xl font-bold text-navy">Gestión de Usuarios</h2>
-          <p className="text-sm text-gray-400">{users.length} usuarios registrados</p>
+          <p className="text-sm text-gray-400">{totalItems} usuarios registrados</p>
         </div>
         <button
           onClick={openAdd}
@@ -130,7 +134,10 @@ export default function AdminUsers() {
             type="text"
             placeholder="Buscar por nombre o correo…"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value)
+              setPage(1)
+            }}
             className="w-full pl-9 pr-4 py-2.5 rounded-xl border text-sm outline-none border-border bg-gray-50 text-navy focus:border-gold"
           />
         </div>
@@ -138,7 +145,10 @@ export default function AdminUsers() {
           {TIPO_FILTERS.map((f) => (
             <button
               key={f.value}
-              onClick={() => setTipoFilter(f.value)}
+              onClick={() => {
+                setTipoFilter(f.value)
+                setPage(1)
+              }}
               className="px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all"
               style={
                 tipoFilter === f.value
@@ -166,11 +176,11 @@ export default function AdminUsers() {
             </thead>
             <tbody>
               {loading && <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400">Cargando usuarios…</td></tr>}
-              {!loading && filtered.length === 0 && (
+              {!loading && users.length === 0 && (
                 <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400">No se encontraron usuarios.</td></tr>
               )}
-              {!loading && filtered.map((u, i) => (
-                <tr key={u._id} style={{ borderBottom: i < filtered.length - 1 ? '1px solid #F1F5F9' : 'none' }} className="hover:bg-gray-50">
+              {!loading && users.map((u, i) => (
+                <tr key={u._id} style={{ borderBottom: i < users.length - 1 ? '1px solid #F1F5F9' : 'none' }} className="hover:bg-gray-50">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white" style={{ background: '#1F2A3C' }}>
@@ -210,6 +220,30 @@ export default function AdminUsers() {
           </table>
         </div>
       </div>
+
+      {totalPages > 1 && (
+        <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-gray-500">Página {page} de {totalPages}</p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setPage((current) => Math.max(1, current - 1))}
+              disabled={page === 1 || loading}
+              className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-600 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Anterior
+            </button>
+            <button
+              type="button"
+              onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+              disabled={page === totalPages || loading}
+              className="rounded-xl bg-[#1F2A3C] px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Siguiente
+            </button>
+          </div>
+        </div>
+      )}
 
       {modal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">

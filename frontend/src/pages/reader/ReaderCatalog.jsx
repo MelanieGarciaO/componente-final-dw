@@ -10,21 +10,26 @@ export default function ReaderCatalog() {
   const [loading, setLoading] = useState(true)
   const [message, setMessage] = useState('')
   const [requesting, setRequesting] = useState(null)
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalItems, setTotalItems] = useState(0)
 
-  const fetchBooks = async (term = '') => {
+  const fetchBooks = async (term = '', pageNumber = 1) => {
     setLoading(true)
     try {
-      const { data } = await api.get('/books', { params: { search: term } })
-      setBooks(data.books)
+      const { data } = await api.get('/books', { params: { search: term, page: pageNumber, limit: 6 } })
+      setBooks(data.books || [])
+      setTotalPages(data.totalPages || 1)
+      setTotalItems(data.totalItems || 0)
     } finally {
       setLoading(false)
     }
   }
 
   useEffect(() => {
-    const timeout = setTimeout(() => fetchBooks(search), 300)
+    const timeout = setTimeout(() => fetchBooks(search, page), 300)
     return () => clearTimeout(timeout)
-  }, [search])
+  }, [search, page])
 
   const categories = useMemo(
     () => ['Todos', ...Array.from(new Set(books.map((book) => book.category).filter(Boolean)))],
@@ -52,7 +57,7 @@ export default function ReaderCatalog() {
     try {
       await api.post('/loans', { bookId: book._id })
       setMessage(`Préstamo solicitado: "${book.title}". Tiene 14 días para devolverlo.`)
-      fetchBooks(search)
+      fetchBooks(search, page)
     } catch (err) {
       setMessage(err.response?.data?.message || 'No se pudo solicitar el préstamo')
     } finally {
@@ -76,7 +81,10 @@ export default function ReaderCatalog() {
               type="text"
               placeholder="Buscar por título, autor o ISBN…"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => {
+                setSearch(e.target.value)
+                setPage(1)
+              }}
               className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-12 pr-4 text-sm text-slate-900 outline-none focus:border-[#C9A227]"
             />
           </div>
@@ -176,6 +184,30 @@ export default function ReaderCatalog() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {totalPages > 1 && (
+        <div className="flex flex-col gap-3 rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-slate-500">Página {page} de {totalPages} · {totalItems} libros encontrados</p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setPage((current) => Math.max(1, current - 1))}
+              disabled={page === 1 || loading}
+              className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Anterior
+            </button>
+            <button
+              type="button"
+              onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+              disabled={page === totalPages || loading}
+              className="rounded-2xl bg-[#1F2A3C] px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Siguiente
+            </button>
+          </div>
         </div>
       )}
     </div>

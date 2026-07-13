@@ -8,15 +8,51 @@ const LOAN_DAYS = 14
 // @access  Privado
 exports.getLoans = async (req, res, next) => {
   try {
+    const { status, search = '', page = '1', limit = '8' } = req.query
     const filter = req.user.role === 'admin' ? {} : { user: req.user._id }
-    if (req.query.status) filter.status = req.query.status
+    if (status) filter.status = status
 
-    const loans = await Loan.find(filter)
+    const loansBase = await Loan.find(filter)
       .populate('book', 'title author isbn cover')
       .populate('user', 'name email')
       .sort({ createdAt: -1 })
 
-    res.status(200).json({ success: true, count: loans.length, loans })
+    const term = search.toLowerCase()
+    const filteredLoans = loansBase.filter((loan) => {
+      const matchesSearch =
+        !term ||
+        loan.user?.name?.toLowerCase().includes(term) ||
+        loan.book?.title?.toLowerCase().includes(term)
+      return matchesSearch
+    })
+
+    const pageNumber = Math.max(1, parseInt(page, 10) || 1)
+    const limitNumber = Math.min(20, Math.max(1, parseInt(limit, 10) || 8))
+    const skip = (pageNumber - 1) * limitNumber
+    const loans = filteredLoans.slice(skip, skip + limitNumber)
+
+    const counts = filteredLoans.reduce(
+      (acc, loan) => {
+        acc[loan.status] = (acc[loan.status] || 0) + 1
+        return acc
+      },
+      { activo: 0, atrasado: 0, devuelto: 0 },
+    )
+
+    const totalPages = Math.ceil(filteredLoans.length / limitNumber)
+
+    res.status(200).json({
+      success: true,
+      count: loans.length,
+      page: pageNumber,
+      limit: limitNumber,
+      totalItems: filteredLoans.length,
+      totalPages,
+      hasNextPage: pageNumber < totalPages,
+      hasPrevPage: pageNumber > 1,
+      counts,
+      loans,
+    })
   } catch (error) {
     next(error)
   }

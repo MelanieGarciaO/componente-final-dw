@@ -3,7 +3,26 @@ const Loan = require('../models/Loan')
 
 exports.getUsers = async (req, res, next) => {
   try {
-    const users = await User.find().sort({ createdAt: -1 }).lean()
+    const { search, tipoLector, role, page = '1', limit = '8' } = req.query
+    const filter = {}
+
+    if (role) filter.role = role
+    if (tipoLector) filter.tipoLector = tipoLector
+    if (search) {
+      filter.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } },
+      ]
+    }
+
+    const pageNumber = Math.max(1, parseInt(page, 10) || 1)
+    const limitNumber = Math.min(20, Math.max(1, parseInt(limit, 10) || 8))
+    const skip = (pageNumber - 1) * limitNumber
+
+    const [users, totalItems] = await Promise.all([
+      User.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limitNumber).lean(),
+      User.countDocuments(filter),
+    ])
 
     const loanCounts = await Loan.aggregate([
       { $group: { _id: '$user', total: { $sum: 1 } } },
@@ -16,7 +35,19 @@ exports.getUsers = async (req, res, next) => {
       loanCount: countMap[String(u._id)] || 0,
     }))
 
-    res.status(200).json({ success: true, count: usersWithCounts.length, users: usersWithCounts })
+    const totalPages = Math.ceil(totalItems / limitNumber)
+
+    res.status(200).json({
+      success: true,
+      count: usersWithCounts.length,
+      page: pageNumber,
+      limit: limitNumber,
+      totalItems,
+      totalPages,
+      hasNextPage: pageNumber < totalPages,
+      hasPrevPage: pageNumber > 1,
+      users: usersWithCounts,
+    })
   } catch (error) {
     next(error)
   }

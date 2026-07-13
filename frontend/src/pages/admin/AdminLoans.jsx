@@ -27,11 +27,21 @@ export default function AdminLoans() {
   const [newLoan, setNewLoan] = useState({ userId: '', bookId: '' })
   const [savingLoan, setSavingLoan] = useState(false)
   const [loanError, setLoanError] = useState('')
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalItems, setTotalItems] = useState(0)
+  const [counts, setCounts] = useState({ activo: 0, atrasado: 0, devuelto: 0 })
 
-  const fetchLoans = async () => {
+  const fetchLoans = async (pageNumber = 1, searchTerm = '', statusFilter = 'all') => {
     try {
-      const { data } = await api.get('/loans')
-      setLoans(data.loans)
+      const { data } = await api.get('/loans', {
+        params: { page: pageNumber, limit: 8, search: searchTerm, status: statusFilter === 'all' ? '' : statusFilter },
+      })
+      setLoans(data.loans || [])
+      setPage(data.page || 1)
+      setTotalPages(data.totalPages || 1)
+      setTotalItems(data.totalItems || 0)
+      setCounts(data.counts || { activo: 0, atrasado: 0, devuelto: 0 })
     } catch (err) {
       setError(err.response?.data?.message || 'Error al cargar los préstamos')
     }
@@ -58,16 +68,23 @@ export default function AdminLoans() {
   useEffect(() => {
     const load = async () => {
       setLoading(true)
-      await Promise.all([fetchLoans(), fetchUsers(), fetchBooks()])
+      await Promise.all([fetchLoans(page, search, filter), fetchUsers(), fetchBooks()])
       setLoading(false)
     }
     load()
   }, [])
 
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      fetchLoans(page, search, filter)
+    }, 300)
+    return () => clearTimeout(timeout)
+  }, [page, search, filter])
+
   const handleReturn = async (loan) => {
     try {
       await api.put(`/loans/${loan._id}/return`)
-      await Promise.all([fetchLoans(), fetchBooks()])
+      await Promise.all([fetchLoans(1, search, filter), fetchBooks()])
     } catch (err) {
       alert(err.response?.data?.message || 'No se pudo registrar la devolución')
     }
@@ -77,7 +94,7 @@ export default function AdminLoans() {
     if (!window.confirm('¿Eliminar este registro de préstamo?')) return
     try {
       await api.delete(`/loans/${loan._id}`)
-      await Promise.all([fetchLoans(), fetchBooks()])
+      await Promise.all([fetchLoans(1, search, filter), fetchBooks()])
     } catch (err) {
       alert(err.response?.data?.message || 'No se pudo eliminar el préstamo')
     }
@@ -91,34 +108,13 @@ export default function AdminLoans() {
       await api.post('/loans', newLoan)
       setDisplayModal(false)
       setNewLoan({ userId: '', bookId: '' })
-      await Promise.all([fetchLoans(), fetchBooks()])
+      await Promise.all([fetchLoans(1, search, filter), fetchBooks()])
     } catch (err) {
       setLoanError(err.response?.data?.message || 'No se pudo registrar el préstamo')
     } finally {
       setSavingLoan(false)
     }
   }
-
-  const filtered = useMemo(
-    () =>
-      loans.filter((l) => {
-        const term = search.toLowerCase()
-        const matchesSearch =
-          l.user?.name?.toLowerCase().includes(term) || l.book?.title?.toLowerCase().includes(term)
-        const matchesFilter = filter === 'all' || l.status === filter
-        return matchesSearch && matchesFilter
-      }),
-    [loans, search, filter]
-  )
-
-  const counts = useMemo(
-    () => ({
-      activo: loans.filter((l) => l.status === 'activo').length,
-      atrasado: loans.filter((l) => l.status === 'atrasado').length,
-      devuelto: loans.filter((l) => l.status === 'devuelto').length,
-    }),
-    [loans]
-  )
 
   const cards = [
     { label: 'Activos', value: counts.activo, color: '#10B981' },
@@ -169,7 +165,10 @@ export default function AdminLoans() {
               type="text"
               placeholder="Buscar por usuario o libro…"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => {
+                setSearch(e.target.value)
+                setPage(1)
+              }}
               className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-4 text-sm text-slate-900 outline-none focus:border-[#C9A227]"
             />
           </div>
@@ -177,7 +176,10 @@ export default function AdminLoans() {
             {FILTERS.map((f) => (
               <button
                 key={f.value}
-                onClick={() => setFilter(f.value)}
+                onClick={() => {
+                  setFilter(f.value)
+                  setPage(1)
+                }}
                 className={`rounded-2xl px-4 py-3 text-sm font-medium transition ${
                   filter === f.value ? 'bg-[#1F2A3C] text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                 }`}
@@ -201,13 +203,13 @@ export default function AdminLoans() {
             </thead>
             <tbody>
               {loading && <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400">Cargando préstamos…</td></tr>}
-              {!loading && filtered.length === 0 && (
+              {!loading && loans.length === 0 && (
                 <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400">No hay préstamos que coincidan.</td></tr>
               )}
-              {!loading && filtered.map((l, i) => {
+              {!loading && loans.map((l, i) => {
                 const s = STATUS_STYLE[l.status] || STATUS_STYLE.activo
                 return (
-                  <tr key={l._id} style={{ borderBottom: i < filtered.length - 1 ? '1px solid #F1F5F9' : 'none' }} className="hover:bg-gray-50">
+                  <tr key={l._id} style={{ borderBottom: i < loans.length - 1 ? '1px solid #F1F5F9' : 'none' }} className="hover:bg-gray-50">
                     <td className="px-4 py-3 font-semibold text-navy">{l.user?.name || '—'}</td>
                     <td className="px-4 py-3">
                       <p className="text-navy">{l.book?.title || '—'}</p>
@@ -243,6 +245,30 @@ export default function AdminLoans() {
           </table>
         </div>
       </div>
+      {totalPages > 1 && (
+        <div className="flex flex-col gap-3 rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-slate-500">Página {page} de {totalPages} · {totalItems} préstamos encontrados</p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setPage((current) => Math.max(1, current - 1))}
+              disabled={page === 1 || loading}
+              className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Anterior
+            </button>
+            <button
+              type="button"
+              onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+              disabled={page === totalPages || loading}
+              className="rounded-2xl bg-[#1F2A3C] px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Siguiente
+            </button>
+          </div>
+        </div>
+      )}
+
       {displayModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-2xl rounded-[28px] bg-white shadow-[0_20px_60px_rgba(0,0,0,0.18)]">
