@@ -24,13 +24,30 @@ export default function AdminLoans() {
   const [displayModal, setDisplayModal] = useState(false)
   const [users, setUsers] = useState([])
   const [books, setBooks] = useState([])
-  const [newLoan, setNewLoan] = useState({ userId: '', bookId: '' })
+  const todayStr = new Date().toISOString().slice(0, 10)
+  const defaultDueStr = (() => {
+    const d = new Date()
+    d.setDate(d.getDate() + 14)
+    return d.toISOString().slice(0, 10)
+  })()
+  const [newLoan, setNewLoan] = useState({ userId: '', bookId: '', loanDate: todayStr, dueDate: defaultDueStr, notes: '' })
   const [savingLoan, setSavingLoan] = useState(false)
   const [loanError, setLoanError] = useState('')
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [totalItems, setTotalItems] = useState(0)
   const [counts, setCounts] = useState({ activo: 0, atrasado: 0, devuelto: 0 })
+  const [returnModalLoan, setReturnModalLoan] = useState(null)
+  const [returnDate, setReturnDate] = useState('')
+  const [bookCondition, setBookCondition] = useState('bueno')
+  const [returningLoan, setReturningLoan] = useState(false)
+  const [returnError, setReturnError] = useState('')
+
+  const CONDITION_OPTIONS = [
+    { value: 'bueno', label: 'Buen estado' },
+    { value: 'deteriorado', label: 'Deteriorado' },
+    { value: 'dano_menor', label: 'Daño menor' },
+  ]
 
   const fetchLoans = async (pageNumber = 1, searchTerm = '', statusFilter = 'all') => {
     try {
@@ -81,12 +98,25 @@ export default function AdminLoans() {
     return () => clearTimeout(timeout)
   }, [page, search, filter])
 
-  const handleReturn = async (loan) => {
+  const openReturnModal = (loan) => {
+    setReturnModalLoan(loan)
+    setReturnDate(new Date().toISOString().slice(0, 10))
+    setBookCondition('bueno')
+    setReturnError('')
+  }
+
+  const confirmReturn = async () => {
+    if (!returnModalLoan) return
+    setReturningLoan(true)
+    setReturnError('')
     try {
-      await api.put(`/loans/${loan._id}/return`)
+      await api.put(`/loans/${returnModalLoan._id}/return`, { returnDate, condition: bookCondition })
+      setReturnModalLoan(null)
       await Promise.all([fetchLoans(1, search, filter), fetchBooks()])
     } catch (err) {
-      alert(err.response?.data?.message || 'No se pudo registrar la devolución')
+      setReturnError(err.response?.data?.message || 'No se pudo registrar la devolución')
+    } finally {
+      setReturningLoan(false)
     }
   }
 
@@ -107,7 +137,7 @@ export default function AdminLoans() {
     try {
       await api.post('/loans', newLoan)
       setDisplayModal(false)
-      setNewLoan({ userId: '', bookId: '' })
+      setNewLoan({ userId: '', bookId: '', loanDate: todayStr, dueDate: defaultDueStr, notes: '' })
       await Promise.all([fetchLoans(1, search, filter), fetchBooks()])
     } catch (err) {
       setLoanError(err.response?.data?.message || 'No se pudo registrar el préstamo')
@@ -135,7 +165,8 @@ export default function AdminLoans() {
         <button
           type="button"
           onClick={() => setDisplayModal(true)}
-          className="inline-flex items-center gap-2 rounded-2xl bg-[#1F2A3C] px-5 py-3 text-sm font-semibold text-white hover:opacity-90"
+          className="inline-flex items-center gap-2 rounded-2xl px-5 py-3 text-sm font-semibold text-white hover:opacity-90"
+          style={{ background: 'linear-gradient(135deg, #C9A227, #A8861F)' }}
         >
           <Plus size={16} /> Registrar préstamo
         </button>
@@ -226,8 +257,8 @@ export default function AdminLoans() {
                       <div className="flex items-center gap-2">
                         {l.status !== 'devuelto' && (
                           <button
-                            onClick={() => handleReturn(l)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold hover:opacity-80"
+                            onClick={() => openReturnModal(l)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold hover:opacity-80"
                             style={{ background: '#EFF6FF', color: '#1D4ED8' }}
                           >
                             <RotateCcw size={13} /> Devolver
@@ -274,12 +305,14 @@ export default function AdminLoans() {
           <div className="w-full max-w-2xl rounded-[28px] bg-white shadow-[0_20px_60px_rgba(0,0,0,0.18)]">
             <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5">
               <div className="flex items-center gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#1F2A3C] text-white">
+                <div
+                  className="flex h-11 w-11 items-center justify-center rounded-2xl text-white"
+                  style={{ background: 'linear-gradient(135deg, #C9A227, #A8861F)' }}
+                >
                   <BookOpen size={18} />
                 </div>
                 <div>
-                  <p className="text-sm uppercase tracking-[0.16em] text-slate-400">Registrar préstamo</p>
-                  <h2 className="text-lg font-semibold text-slate-900">Nuevo préstamo</h2>
+                  <h2 className="text-lg font-semibold text-slate-900">Registrar Préstamo</h2>
                 </div>
               </div>
               <button className="rounded-2xl p-2 text-slate-500 hover:bg-slate-100" onClick={() => setDisplayModal(false)}>
@@ -287,39 +320,70 @@ export default function AdminLoans() {
               </button>
             </div>
             <form onSubmit={createLoan} className="space-y-5 px-6 py-6">
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Usuario</label>
+                <select
+                  value={newLoan.userId}
+                  onChange={(e) => setNewLoan((prev) => ({ ...prev, userId: e.target.value }))}
+                  className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none text-slate-900 focus:border-[#C9A227]"
+                  required
+                >
+                  <option value="">Nombre o correo del lector</option>
+                  {readers.map((user) => (
+                    <option key={user._id} value={user._id}>
+                      {user.name} · {user.email}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Libro</label>
+                <select
+                  value={newLoan.bookId}
+                  onChange={(e) => setNewLoan((prev) => ({ ...prev, bookId: e.target.value }))}
+                  className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none text-slate-900 focus:border-[#C9A227]"
+                  required
+                >
+                  <option value="">Título o ISBN del libro</option>
+                  {availableBooks.map((book) => (
+                    <option key={book._id} value={book._id}>
+                      {book.title} · {book.author}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Usuario</label>
-                  <select
-                    value={newLoan.userId}
-                    onChange={(e) => setNewLoan((prev) => ({ ...prev, userId: e.target.value }))}
-                    className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none text-slate-900"
+                  <label className="block text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">F. Préstamo</label>
+                  <input
+                    type="date"
+                    value={newLoan.loanDate}
+                    onChange={(e) => setNewLoan((prev) => ({ ...prev, loanDate: e.target.value }))}
+                    className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none text-slate-900 focus:border-[#C9A227]"
                     required
-                  >
-                    <option value="">Seleccione un lector</option>
-                    {readers.map((user) => (
-                      <option key={user._id} value={user._id}>
-                        {user.name} · {user.email}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Libro</label>
-                  <select
-                    value={newLoan.bookId}
-                    onChange={(e) => setNewLoan((prev) => ({ ...prev, bookId: e.target.value }))}
-                    className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none text-slate-900"
+                  <label className="block text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">F. Devolución</label>
+                  <input
+                    type="date"
+                    value={newLoan.dueDate}
+                    min={newLoan.loanDate}
+                    onChange={(e) => setNewLoan((prev) => ({ ...prev, dueDate: e.target.value }))}
+                    className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none text-slate-900 focus:border-[#C9A227]"
                     required
-                  >
-                    <option value="">Seleccione un libro disponible</option>
-                    {availableBooks.map((book) => (
-                      <option key={book._id} value={book._id}>
-                        {book.title} · {book.author}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </div>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Observaciones</label>
+                <textarea
+                  value={newLoan.notes}
+                  onChange={(e) => setNewLoan((prev) => ({ ...prev, notes: e.target.value }))}
+                  placeholder="Notas adicionales…"
+                  rows={3}
+                  className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none text-slate-900 focus:border-[#C9A227] resize-none"
+                />
               </div>
               {loanError && <div className="rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-700">{loanError}</div>}
               <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
@@ -333,12 +397,78 @@ export default function AdminLoans() {
                 <button
                   type="submit"
                   disabled={savingLoan}
-                  className="rounded-2xl bg-[#1F2A3C] px-5 py-3 text-sm font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="rounded-2xl text-white px-5 py-3 text-sm font-semibold hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                  style={{width: 256, height: 48, background: '#1F2A3C'  }}
                 >
                   {savingLoan ? 'Registrando…' : 'Registrar préstamo'}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {returnModalLoan && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-[28px] bg-white shadow-[0_20px_60px_rgba(0,0,0,0.18)]">
+            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600">
+                  <RotateCcw size={18} />
+                </div>
+                <h2 className="text-lg font-semibold text-slate-900">Registrar Devolución</h2>
+              </div>
+              <button className="rounded-2xl p-2 text-slate-500 hover:bg-slate-100" onClick={() => setReturnModalLoan(null)}>
+                <X size={20} />
+              </button>
+            </div>
+            <div className="space-y-5 px-6 py-6">
+              <div className="rounded-2xl bg-slate-50 px-4 py-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Información del préstamo</p>
+                <p className="mt-1 text-base font-semibold text-slate-900">{returnModalLoan.book?.title || '—'}</p>
+                <p className="text-sm text-slate-500">Prestado a: {returnModalLoan.user?.name || '—'}</p>
+                <p className="text-sm text-slate-400">Vencimiento: {new Date(returnModalLoan.dueDate).toLocaleDateString('es-EC', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Fecha de devolución</label>
+                <input
+                  type="date"
+                  value={returnDate}
+                  onChange={(e) => setReturnDate(e.target.value)}
+                  className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none text-slate-900 focus:border-[#C9A227]"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Estado del libro</label>
+                <select
+                  value={bookCondition}
+                  onChange={(e) => setBookCondition(e.target.value)}
+                  className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none text-slate-900 focus:border-[#C9A227]"
+                >
+                  {CONDITION_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+              {returnError && <div className="rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-700">{returnError}</div>}
+              <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  className="rounded-2xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+                  onClick={() => setReturnModalLoan(null)}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  disabled={returningLoan}
+                  onClick={confirmReturn}
+                  className="rounded-2xl bg-emerald-500 px-5 py-3 text-sm font-semibold text-white hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {returningLoan ? 'Confirmando…' : 'Confirmar devolución'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

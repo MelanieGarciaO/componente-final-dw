@@ -63,7 +63,7 @@ exports.getLoans = async (req, res, next) => {
 // @access  Privado
 exports.createLoan = async (req, res, next) => {
   try {
-    const { bookId, userId } = req.body
+    const { bookId, userId, loanDate, dueDate: dueDateInput, notes } = req.body
 
     const book = await Book.findById(bookId)
     if (!book) return res.status(404).json({ success: false, message: 'Libro no encontrado' })
@@ -74,13 +74,18 @@ exports.createLoan = async (req, res, next) => {
     // Un lector solo puede solicitar préstamos para sí mismo; el admin puede asignarlos a cualquier usuario
     const targetUser = req.user.role === 'admin' && userId ? userId : req.user._id
 
-    const dueDate = new Date()
-    dueDate.setDate(dueDate.getDate() + LOAN_DAYS)
+    let dueDate = dueDateInput ? new Date(dueDateInput) : null
+    if (!dueDate || Number.isNaN(dueDate.getTime())) {
+      dueDate = new Date()
+      dueDate.setDate(dueDate.getDate() + LOAN_DAYS)
+    }
 
     const loan = await Loan.create({
       book: book._id,
       user: targetUser,
+      ...(loanDate ? { loanDate: new Date(loanDate) } : {}),
       dueDate,
+      notes: notes || '',
     })
 
     book.available -= 1
@@ -113,8 +118,12 @@ exports.returnLoan = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Este préstamo ya fue devuelto' })
     }
 
+    const { returnDate, condition } = req.body
+    const parsedReturnDate = returnDate ? new Date(returnDate) : new Date()
+
     loan.status = 'devuelto'
-    loan.returnDate = new Date()
+    loan.returnDate = Number.isNaN(parsedReturnDate.getTime()) ? new Date() : parsedReturnDate
+    if (condition) loan.bookCondition = condition
     await loan.save()
 
     const book = await Book.findById(loan.book)

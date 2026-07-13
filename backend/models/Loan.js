@@ -24,6 +24,14 @@ const loanSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    notes: {
+      type: String,
+      default: '',
+    },
+    bookCondition: {
+      type: String,
+      enum: ['bueno', 'deteriorado', 'dano_menor'],
+    },
     status: {
       type: String,
       enum: ['activo', 'devuelto', 'atrasado'],
