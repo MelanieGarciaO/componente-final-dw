@@ -14,6 +14,13 @@ html, body {
   color: #1F2A3C;
 }
 
+/* Tema oscuro */
+html[data-theme='dark'],
+html[data-theme='dark'] body {
+  background-color: #0f172a;
+  color: #f8fafc;
+}
+
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;

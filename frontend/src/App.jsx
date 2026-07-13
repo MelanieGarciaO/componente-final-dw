@@ -1,6 +1,8 @@
+import { useEffect, useState } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './context/AuthContext'
 import ProtectedRoute from './components/ProtectedRoute'
+import api from './api/axios'
 import AdminReports from './pages/admin/AdminReports'
 
 import LoginPage from './pages/LoginPage'
@@ -20,8 +22,43 @@ import ReaderProfile from './pages/reader/ReaderProfile'
 
 export default function App() {
   const { user, loading } = useAuth()
+  const [theme, setTheme] = useState('light')
+  const [appLoading, setAppLoading] = useState(true)
 
-  if (loading) {
+  useEffect(() => {
+    const loadTheme = async () => {
+      try {
+        // Intentar cargar del localStorage primero
+        const storedTheme = localStorage.getItem('bibliosys_theme')
+        if (storedTheme) {
+          setTheme(storedTheme)
+          document.documentElement.setAttribute('data-theme', storedTheme)
+        } else {
+          // Si no está en localStorage, cargar del backend
+          const { data } = await api.get('/settings')
+          if (data?.settings?.theme) {
+            setTheme(data.settings.theme)
+            document.documentElement.setAttribute('data-theme', data.settings.theme)
+            localStorage.setItem('bibliosys_theme', data.settings.theme)
+          }
+        }
+      } catch {
+        setTheme('light')
+        document.documentElement.setAttribute('data-theme', 'light')
+      } finally {
+        setAppLoading(false)
+      }
+    }
+
+    loadTheme()
+  }, [])
+
+  const changeTheme = (newTheme) => {
+    setTheme(newTheme)
+    document.documentElement.setAttribute('data-theme', newTheme)
+  }
+
+  if (loading || appLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-surface">
         <p className="text-navy font-medium">Cargando…</p>

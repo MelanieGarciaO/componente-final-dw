@@ -1,12 +1,12 @@
-import { useState } from 'react'
-import { Globe, Bell, Shield, Database } from 'lucide-react'
-
-const STORAGE_KEY = 'bibliosys_settings'
+import { useEffect, useState } from 'react'
+import { Globe, Bell, Shield, Database, Moon, SunMedium } from 'lucide-react'
+import api from '../../api/axios'
 
 const DEFAULTS = {
+  theme: 'light',
   institutionName: 'Universidad Nacional',
   maxLoanDays: 14,
-  fineDayAmount: '5.00',
+  fineDayAmount: 5,
   reminderDays: 3,
   notificationEmail: 'sistema@biblioteca.edu',
   sessionTimeout: 60,
@@ -15,26 +15,53 @@ const DEFAULTS = {
   historyRetentionDays: 365,
 }
 
-const loadSettings = () => {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    return raw ? { ...DEFAULTS, ...JSON.parse(raw) } : DEFAULTS
-  } catch {
-    return DEFAULTS
-  }
-}
-
 export default function AdminSettings() {
-  const [form, setForm] = useState(loadSettings)
+  const [form, setForm] = useState(DEFAULTS)
   const [saved, setSaved] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const { data } = await api.get('/settings')
+        setForm({ ...DEFAULTS, ...data.settings })
+      } catch (err) {
+        setError(err.response?.data?.message || 'No se pudieron cargar las configuraciones')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadSettings()
+  }, [])
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(form))
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
+    setError('')
+    try {
+      const payload = {
+        ...form,
+        fineDayAmount: Number(form.fineDayAmount),
+        maxLoanDays: Number(form.maxLoanDays),
+        reminderDays: Number(form.reminderDays),
+        sessionTimeout: Number(form.sessionTimeout),
+        maxLoginAttempts: Number(form.maxLoginAttempts),
+        historyRetentionDays: Number(form.historyRetentionDays),
+      }
+      await api.put('/settings', payload)
+      
+      // Aplicar el tema inmediatamente
+      document.documentElement.setAttribute('data-theme', form.theme)
+      localStorage.setItem('bibliosys_theme', form.theme)
+      
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2000)
+    } catch (err) {
+      setError(err.response?.data?.message || 'No se pudieron guardar los cambios')
+    }
   }
 
   const inputCls = 'w-full px-3 py-2.5 rounded-xl border text-sm outline-none bg-gray-50 border-border text-navy focus:border-gold'
@@ -47,6 +74,9 @@ export default function AdminSettings() {
         <p className="text-sm text-gray-400">Administre las preferencias generales de BiblioSys</p>
       </div>
 
+      {error && <p className="text-sm text-red-600 bg-red-50 px-4 py-2 rounded-lg">{error}</p>}
+      {loading && <p className="text-sm text-gray-500">Cargando configuraciones…</p>}
+
       <section className="bg-white rounded-2xl p-6" style={{ boxShadow: '0 2px 12px rgba(31,42,60,0.07)' }}>
         <div className="flex items-center gap-2 mb-5">
           <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-blue-50">
@@ -55,6 +85,17 @@ export default function AdminSettings() {
           <h3 className="font-bold text-navy">General</h3>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className={labelCls}>TEMA DEL SISTEMA</label>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => set('theme', 'light')} className={`flex flex-1 items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-semibold ${form.theme === 'light' ? 'border-[#C9A227] bg-amber-50 text-[#A8861F]' : 'border-slate-200 bg-white text-slate-600'}`}>
+                <SunMedium size={16} /> Claro
+              </button>
+              <button type="button" onClick={() => set('theme', 'dark')} className={`flex flex-1 items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-semibold ${form.theme === 'dark' ? 'border-[#1F2A3C] bg-slate-800 text-white' : 'border-slate-200 bg-white text-slate-600'}`}>
+                <Moon size={16} /> Oscuro
+              </button>
+            </div>
+          </div>
           <div>
             <label className={labelCls}>NOMBRE DE LA INSTITUCIÓN</label>
             <input value={form.institutionName} onChange={(e) => set('institutionName', e.target.value)} className={inputCls} />
@@ -134,7 +175,7 @@ export default function AdminSettings() {
 
       <div className="flex items-center justify-end gap-3">
         {saved && <p className="text-xs px-3 py-2 rounded-lg text-green-700 bg-green-50">Cambios guardados</p>}
-        <button type="button" onClick={() => setForm(loadSettings())} className="px-5 py-2.5 rounded-xl border text-sm font-semibold hover:bg-gray-50 border-border text-muted">
+        <button type="button" onClick={() => setForm(DEFAULTS)} className="px-5 py-2.5 rounded-xl border text-sm font-semibold hover:bg-gray-50 border-border text-muted">
           Cancelar
         </button>
         <button type="submit" className="px-5 py-2.5 rounded-xl text-sm font-semibold text-white hover:opacity-90" style={{ background: 'linear-gradient(135deg, #1F2A3C, #2A3A52)' }}>

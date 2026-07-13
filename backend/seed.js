@@ -4,12 +4,14 @@ require('dotenv').config()
 const connectDB = require('./config/db')
 const User = require('./models/User')
 const Book = require('./models/Book')
+const SystemSetting = require('./models/SystemSetting')
 
 const run = async () => {
   await connectDB()
 
   await User.deleteMany()
   await Book.deleteMany()
+  await SystemSetting.deleteMany()
 
   await User.create([
     { name: 'Admin Principal', email: 'admin@biblioteca.edu', password: 'admin123', role: 'admin' },
@@ -24,6 +26,19 @@ const run = async () => {
     { isbn: '978-0062316097', title: 'Sapiens', author: 'Yuval Noah Harari', category: 'Historia', stock: 4, available: 4, description: 'De animales a dioses.' },
     { isbn: '978-6075573113', title: 'El Quijote', author: 'Miguel de Cervantes', category: 'Novela', stock: 3, available: 3, description: 'La obra cumbre de la literatura española.' },
   ])
+
+  await SystemSetting.create({
+    theme: 'light',
+    institutionName: 'Universidad Nacional',
+    maxLoanDays: 14,
+    fineDayAmount: 5,
+    reminderDays: 3,
+    notificationEmail: 'sistema@biblioteca.edu',
+    sessionTimeout: 60,
+    maxLoginAttempts: 5,
+    autoBackup: 'Diario',
+    historyRetentionDays: 365,
+  })
 
   console.log('Datos de ejemplo insertados correctamente.')
   process.exit(0)
