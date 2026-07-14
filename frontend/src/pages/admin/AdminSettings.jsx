@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Globe, Bell, Shield, Database, Moon, SunMedium } from 'lucide-react'
+import { Globe, Bell, Shield, Database } from 'lucide-react'
 import api from '../../api/axios'
 
 const DEFAULTS = {
@@ -52,11 +52,11 @@ export default function AdminSettings() {
         historyRetentionDays: Number(form.historyRetentionDays),
       }
       await api.put('/settings', payload)
-      
+
       // Aplicar el tema inmediatamente
       document.documentElement.setAttribute('data-theme', form.theme)
       localStorage.setItem('bibliosys_theme', form.theme)
-      
+
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
     } catch (err) {
@@ -85,17 +85,6 @@ export default function AdminSettings() {
           <h3 className="font-bold text-navy">General</h3>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className={labelCls}>TEMA DEL SISTEMA</label>
-            <div className="flex gap-2">
-              <button type="button" onClick={() => set('theme', 'light')} className={`flex flex-1 items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-semibold ${form.theme === 'light' ? 'border-[#C9A227] bg-amber-50 text-[#A8861F]' : 'border-slate-200 bg-white text-slate-600'}`}>
-                <SunMedium size={16} /> Claro
-              </button>
-              <button type="button" onClick={() => set('theme', 'dark')} className={`flex flex-1 items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-semibold ${form.theme === 'dark' ? 'border-[#1F2A3C] bg-slate-800 text-white' : 'border-slate-200 bg-white text-slate-600'}`}>
-                <Moon size={16} /> Oscuro
-              </button>
-            </div>
-          </div>
           <div>
             <label className={labelCls}>NOMBRE DE LA INSTITUCIÓN</label>
             <input value={form.institutionName} onChange={(e) => set('institutionName', e.target.value)} className={inputCls} />

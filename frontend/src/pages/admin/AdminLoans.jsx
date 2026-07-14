@@ -386,10 +386,10 @@ export default function AdminLoans() {
                 />
               </div>
               {loanError && <div className="rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-700">{loanError}</div>}
-              <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+              <div className="grid grid-cols-2 gap-3">
                 <button
                   type="button"
-                  className="w-full sm:w-[190px] flex items-center justify-center rounded-2xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+                  className="w-full flex items-center justify-center rounded-2xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-100"
                   onClick={() => setDisplayModal(false)}
                 >
                   Cancelar
@@ -397,7 +397,7 @@ export default function AdminLoans() {
                 <button
                   type="submit"
                   disabled={savingLoan}
-                  className="w-full sm:w-[190px] flex items-center justify-center rounded-2xl text-white px-5 py-3 text-sm font-semibold hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="w-full flex items-center justify-center rounded-2xl text-white px-5 py-3 text-sm font-semibold hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
                   style={{ background: '#1F2A3C' }}
                 >
                   {savingLoan ? 'Registrando…' : 'Registrar préstamo'}
