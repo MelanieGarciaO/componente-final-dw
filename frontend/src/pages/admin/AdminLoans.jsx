@@ -302,7 +302,7 @@ export default function AdminLoans() {
 
       {displayModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-2xl rounded-[28px] bg-white shadow-[0_20px_60px_rgba(0,0,0,0.18)]">
+          <div className="w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-[28px] bg-white shadow-[0_20px_60px_rgba(0,0,0,0.18)]">
             <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5">
               <div className="flex items-center gap-3">
                 <div
@@ -389,7 +389,7 @@ export default function AdminLoans() {
               <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
                 <button
                   type="button"
-                  className="rounded-2xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+                  className="w-full sm:w-[190px] flex items-center justify-center rounded-2xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-100"
                   onClick={() => setDisplayModal(false)}
                 >
                   Cancelar
@@ -397,8 +397,8 @@ export default function AdminLoans() {
                 <button
                   type="submit"
                   disabled={savingLoan}
-                  className="rounded-2xl text-white px-5 py-3 text-sm font-semibold hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-                  style={{width: 256, height: 48, background: '#1F2A3C'  }}
+                  className="w-full sm:w-[190px] flex items-center justify-center rounded-2xl text-white px-5 py-3 text-sm font-semibold hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                  style={{ background: '#1F2A3C' }}
                 >
                   {savingLoan ? 'Registrando…' : 'Registrar préstamo'}
                 </button>
