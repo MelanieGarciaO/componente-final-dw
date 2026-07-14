@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Search, BookOpen } from 'lucide-react'
+import { Search, BookOpen, X, CheckCircle2 } from 'lucide-react'
 import api from '../../api/axios'
 
 export default function ReaderCatalog() {
@@ -13,6 +13,8 @@ export default function ReaderCatalog() {
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [totalItems, setTotalItems] = useState(0)
+  const [selectedBook, setSelectedBook] = useState(null)
+  const [modalError, setModalError] = useState('')
 
   const fetchBooks = async (term = '', pageNumber = 1) => {
     setLoading(true)
@@ -54,15 +56,27 @@ export default function ReaderCatalog() {
   const requestLoan = async (book) => {
     setRequesting(book._id)
     setMessage('')
+    setModalError('')
     try {
       await api.post('/loans', { bookId: book._id })
       setMessage(`Préstamo solicitado: "${book.title}". Tiene 14 días para devolverlo.`)
+      setSelectedBook(null)
       fetchBooks(search, page)
     } catch (err) {
-      setMessage(err.response?.data?.message || 'No se pudo solicitar el préstamo')
+      const errMsg = err.response?.data?.message || 'No se pudo solicitar el préstamo'
+      if (selectedBook) {
+        setModalError(errMsg)
+      } else {
+        setMessage(errMsg)
+      }
     } finally {
       setRequesting(null)
     }
+  }
+
+  const openBookDetails = (book) => {
+    setSelectedBook(book)
+    setModalError('')
   }
 
   return (
@@ -123,7 +137,8 @@ export default function ReaderCatalog() {
       </div>
 
       {message && (
-        <div className="rounded-[28px] border border-amber-100 bg-amber-50 px-5 py-4 text-sm text-amber-900">
+        <div className="flex items-center gap-2 rounded-[28px] border border-amber-100 bg-amber-50 px-5 py-4 text-sm text-amber-900">
+          <CheckCircle2 size={18} className="shrink-0 text-amber-600" />
           {message}
         </div>
       )}
@@ -139,7 +154,11 @@ export default function ReaderCatalog() {
           {filteredBooks.map((book) => (
             <div
               key={book._id}
-              className="group overflow-hidden rounded-[28px] bg-white shadow-[0_12px_30px_rgba(15,23,42,0.08)] transition-transform duration-300 hover:-translate-y-1"
+              role="button"
+              tabIndex={0}
+              onClick={() => openBookDetails(book)}
+              onKeyDown={(e) => (e.key === 'Enter' ? openBookDetails(book) : null)}
+              className="group cursor-pointer overflow-hidden rounded-[28px] bg-white shadow-[0_12px_30px_rgba(15,23,42,0.08)] transition-transform duration-300 hover:-translate-y-1"
             >
               <div className="h-56 overflow-hidden bg-slate-100">
                 {book.cover ? (
@@ -175,7 +194,10 @@ export default function ReaderCatalog() {
                 {book.description && <p className="text-sm text-slate-500 line-clamp-3">{book.description}</p>}
                 <button
                   type="button"
-                  onClick={() => requestLoan(book)}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    requestLoan(book)
+                  }}
                   disabled={book.available === 0 || requesting === book._id}
                   className="mt-auto inline-flex items-center justify-center rounded-2xl bg-[#1F2A3C] px-4 py-3 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
                 >
@@ -207,6 +229,91 @@ export default function ReaderCatalog() {
             >
               Siguiente
             </button>
+          </div>
+        </div>
+      )}
+
+      {selectedBook && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setSelectedBook(null)}
+        >
+          <div
+            className="grid w-full max-w-3xl grid-cols-1 overflow-hidden rounded-[28px] bg-white shadow-[0_20px_60px_rgba(0,0,0,0.25)] sm:grid-cols-2"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="h-56 bg-slate-900 sm:h-full">
+              {selectedBook.cover ? (
+                <img
+                  src={selectedBook.cover}
+                  alt={`Portada ${selectedBook.title}`}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <div className="flex h-full items-center justify-center text-slate-500">
+                  <BookOpen size={48} />
+                </div>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-4 p-6">
+              <div className="flex items-start justify-between gap-3">
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                  {selectedBook.category}
+                </span>
+                <button
+                  className="rounded-2xl p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                  onClick={() => setSelectedBook(null)}
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div>
+                <h2 className="text-2xl font-bold text-slate-900">{selectedBook.title}</h2>
+                <p className="mt-1 text-sm text-slate-500">{selectedBook.author}</p>
+              </div>
+
+              {selectedBook.description && (
+                <p className="text-sm leading-relaxed text-slate-500">{selectedBook.description}</p>
+              )}
+
+              <div className="mt-auto flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3">
+                <span className="text-sm text-slate-500">Disponibles</span>
+                <span
+                  className={`text-sm font-semibold ${
+                    selectedBook.available > 0 ? 'text-emerald-600' : 'text-rose-600'
+                  }`}
+                >
+                  {selectedBook.available > 0
+                    ? `${selectedBook.available} de ${selectedBook.stock} ejemplares`
+                    : 'Sin ejemplares disponibles'}
+                </span>
+              </div>
+
+              {modalError && (
+                <div className="rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-700">{modalError}</div>
+              )}
+
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  className="w-full rounded-2xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+                  onClick={() => setSelectedBook(null)}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => requestLoan(selectedBook)}
+                  disabled={selectedBook.available === 0 || requesting === selectedBook._id}
+                  className="w-full rounded-2xl px-5 py-3 text-sm font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                  style={{ background: 'linear-gradient(135deg, #C9A227, #A8861F)' }}
+                >
+                  {requesting === selectedBook._id ? 'Solicitando…' : 'Solicitar préstamo'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
